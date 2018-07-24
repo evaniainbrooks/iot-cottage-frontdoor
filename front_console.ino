@@ -22,7 +22,7 @@ int outsideLightState = HIGH;
 int livingRoomLightState = HIGH;
 int stoveLightState = HIGH;
 
-#define VERSION_MESSAGE F("Front Console v0.13 24/07/18")
+#define VERSION_MESSAGE F("Front Console v0.14 24/07/18")
 
 // Adafruit IO setup
 #define AIO_SERVER      "io.adafruit.com"
@@ -42,7 +42,9 @@ Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO
 
 /****************************** Feeds ***************************************/
 
-// Setup a feed called 'photocell' for publishing.
+#define WILL_FEED AIO_USERNAME "/feeds/nodes.frontdoor"
+Adafruit_MQTT_Publish lastwill = Adafruit_MQTT_Publish(&mqtt, WILL_FEED);
+
 // Notice MQTT paths for AIO follow the form: <username>/feeds/<feedname>
 Adafruit_MQTT_Publish front = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/doors.front");
 Adafruit_MQTT_Publish side = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/doors.side");
@@ -85,11 +87,14 @@ void setup() {
   Serial.print("HTTP server listening on ");
   Serial.println(Ethernet.localIP());
 
+  //MQTT_connect();
   Serial.println("MQTT subscribe");
+
   //mqtt.subscribe(&tvtoggle);
   mqtt.subscribe(&livingroomlight);
   mqtt.subscribe(&stovelight);
   mqtt.subscribe(&outsidelight);
+  mqtt.will(WILL_FEED, "0");
 }
 
 
@@ -104,14 +109,6 @@ void loop() {
   // this is our 'wait for incoming subscription packets' busy subloop
   Adafruit_MQTT_Subscribe *subscription;
   while ((subscription = mqtt.readSubscription(1000))) {
-    Serial.println("Incoming message");
-    //irrecv.enableIRIn();
-    //irrecv.resume();
-
-   // if (subscription == &tvtoggle) {
-     // Serial.println("msg: TOGGLE TV");
-     // irsend.sendRC5(0xc, 4);
-    //} else
     if (subscription == &outsidelight) {
 
       Serial.println(F("msg: OUTSIDE LIGHT"));
@@ -131,19 +128,9 @@ void loop() {
       stoveLightState = (stoveLightState == HIGH ? LOW : HIGH);
       digitalWrite(STOVE_LIGHT_PIN, stoveLightState);
     }
-
-    //else if (subscription == &soundbartoggle) {
-     // Serial.println("msg: TOGGLE SOUNDBAR");
-     // irsend.sendRC6(0x150C, 16);
-   // }
   }
 
-  //detectEdge(FRONT_DOOR_PIN, &front);
-  //detectEdge(SIDE_DOOR_PIN, &side);
-
   handleHttpClientRequest();
-
-  //IR_decode();
 
   MQTT_ping();
   delay(1000);
@@ -158,10 +145,10 @@ void detectEdge(int pin, Adafruit_MQTT_Publish* feed) {
     Serial.print("Publishing state change on pin ");
     Serial.print(pin);
     if (state == HIGH) {
-      Serial.println(", high");
+      Serial.println(F(", high"));
       feed->publish("1");
     } else {
-      Serial.println(", low");
+      Serial.println(F(", low"));
       feed->publish("0");
     }
   }
@@ -206,6 +193,8 @@ void MQTT_ping() {
     if (!mqtt.ping()) {
       Serial.println(F("Failed to ping"));
       mqtt.disconnect();
+    } else {
+      lastwill.publish(String(now, DEC).c_str());
     }
   }
 }
