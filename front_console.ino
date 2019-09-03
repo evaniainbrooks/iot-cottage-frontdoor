@@ -6,7 +6,7 @@
 #include <Dns.h>
 #include <Dhcp.h>
 
-#define VERSION_MESSAGE F("Front Console v0.20 28/08/19")
+#define VERSION_MESSAGE F("Front Console v0.21 03/09/19")
 
 #define ROOM_LIGHT_PIN 4
 #define STOVE_LIGHT_PIN 7
@@ -22,7 +22,7 @@
 #define SERVER_LISTEN_PORT 80
 #define MQTT_CONNECT_RETRY_MAX 5
 
-#define AIO_SERVER      "192.168.2.20"
+#define AIO_SERVER      "raspberry.home"
 #define AIO_SERVERPORT  1883
 #define AIO_USERNAME    "mosquitto"
 #define AIO_KEY         "qq211"
@@ -334,6 +334,7 @@ void handleMqttToggleCommand(const char* command, int outputPin, int acsPin) {
     if (strcmp((char *)command, "1") == 0 && lastState[acsPin] == LOW) {
       Serial.println(F("ACS relay is OFF (turn on)"));
       lastState[outputPin] = lastState[outputPin] == HIGH ? LOW : HIGH;
+      lastState[acsPin] = HIGH; // Optimistic toggling of ACS pin state. This avoids an extra rising edge message being published
       Serial.print(F("Setting state to "));
       Serial.print(lastState[outputPin]);
       digitalWrite(outputPin, lastState[outputPin]);
@@ -341,12 +342,14 @@ void handleMqttToggleCommand(const char* command, int outputPin, int acsPin) {
     } else if (strcmp((char *)command, "0") == 0 && lastState[acsPin] == HIGH) {
       Serial.println(F("ACS relay is ON (turn off)"));
       lastState[outputPin] = lastState[outputPin] == HIGH ? LOW : HIGH;
+      lastState[acsPin] = lastState[acsPin] == HIGH ? LOW : HIGH;  // Optimistic toggling of ACS pin state. This avoids an extra falling edge message being published
       Serial.print(F("Setting state to "));
       Serial.print(lastState[outputPin]);
       digitalWrite(outputPin, lastState[outputPin]);
     } else if (strcmp((char*)command, "2") == 0) {
       Serial.println(F("ACS relay toggle"));
       lastState[outputPin] = lastState[outputPin] == HIGH ? LOW : HIGH;
+      lastState[acsPin] = lastState[acsPin] == HIGH ? LOW : HIGH; // Optimistic toggling of ACS pin state
       digitalWrite(outputPin, lastState[outputPin]);
     }
   }
